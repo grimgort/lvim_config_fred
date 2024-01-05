@@ -1,36 +1,7 @@
--- Read the docs: https://www.lunarvim.org/docs/configuration
--- Example configs: https://github.com/LunarVim/starter.lvim
--- Video Tutorials: https://www.youtube.com/watch?v=sFA9kX-Ud_c&list=PLhoH5vyxr6QqGu0i7tt_XoVK9v-KvZ3m6
--- Forum: https://www.reddit.com/r/lunarvim/
--- Discord: https://discord.com/invite/Xb9B4Ny
-
--- Enable powershell as your default shell
--- vim.opt.shell = "pwsh.exe"
--- vim.opt.shellcmdflag =
--- "-NoLogo -NoProfile -ExecutionPolicy RemoteSigned -Command [Console]::InputEncoding=[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;"
--- vim.cmd [[
--- 		let &shellredir = '2>&1 | Out-File -Encoding UTF8 %s; exit $LastExitCode'
--- 		let &shellpipe = '2>&1 | Out-File -Encoding UTF8 %s; exit $LastExitCode'
--- 		set shellquote= shellxquote=
---   ]]
-
--- -- Set a compatible clipboard manager
--- vim.g.clipboard = {
---   copy = {
---     ["+"] = "win32yank.exe -i --crlf",
---     ["*"] = "win32yank.exe -i --crlf",
---   },
---   paste = {
---     ["+"] = "win32yank.exe -o --lf",
---     ["*"] = "win32yank.exe -o --lf",
---   },
--- }
-
 -- Get the current file's directory
 local current_path = debug.getinfo(1, "S").source:sub(2):match("(.*[/\\])")
 
 -- Modify the package path to include the current directory
-package.path = package.path .. ';' .. current_path .. '?.lua'
 
 -- Require the file from the current directory
 -- local myModule = require("config\\aerial") -- Replace "myModule" with the name of your file
@@ -40,9 +11,178 @@ vim.opt.guifont = "JetBrains Mono:h13"
 -- vim.cmd({ cmd = "set", args = { "guifont=JetBrains\\ Mono:h13" }, bang = true })
 vim.opt.wrap = true -- bug with treesitter context
 
+lvim.builtin.which_key.mappings["bh"] = {"<cmd>BufferLineCyclePrev<cr>", "left"}
+
+package.path = package.path .. ';' .. current_path .. '?.lua'
 lvim.plugins = {
+  {
+    "danymat/neogen",
+    dependencies = "nvim-treesitter/nvim-treesitter",
+    config = true,
+    -- Uncomment next line if you want to follow only stable versions
+    version = "*"
+  },
+  {
+    "nvim-neo-tree/neo-tree.nvim",
+    branch = "v3.x",
+    dependencies = { "MunifTanjim/nui.nvim" },
+    cmd = "Neotree",
+    init = function() vim.g.neo_tree_remove_legacy_commands = true end,
+    opts = function()
+      -- local utils = require "base.utils"
+      -- local get_icon = utils.get_icon
+      return {
+        auto_clean_after_session_restore = true,
+        close_if_last_window = true,
+        buffers = {
+          show_unloaded = true
+        },
+        sources = { "filesystem", "buffers", "git_status" },
+        source_selector = {
+          winbar = true,
+          content_layout = "center",
+          -- sources = {
+          --   {
+          --     source = "filesystem",
+          --     display_name = get_icon("FolderClosed", 1, true) .. "File",
+          --   },
+          --   {
+          --     source = "buffers",
+          --     display_name = get_icon("DefaultFile", 1, true) .. "Bufs",
+          --   },
+          --   {
+          --     source = "git_status",
+          --     display_name = get_icon("Git", 1, true) .. "Git",
+          --   },
+          --   {
+          --     source = "diagnostics",
+          --     display_name = get_icon("Diagnostic", 1, true) .. "Diagnostic",
+          --   },
+          -- },
+        },
+        default_component_configs = {
+          indent = { padding = 0 },
+          git_status = {
+          },
+        },
+        -- A command is a function that we can assign to a mapping (below)
+        commands = {
+          system_open = function(state)
+            system_open(state.tree:get_node():get_id())
+          end,
+          parent_or_close = function(state)
+            local node = state.tree:get_node()
+            if
+                (node.type == "directory" or node:has_children())
+                and node:is_expanded()
+            then
+              state.commands.toggle_node(state)
+            else
+              require("neo-tree.ui.renderer").focus_node(
+                state,
+                node:get_parent_id()
+              )
+            end
+          end,
+          child_or_open = function(state)
+            local node = state.tree:get_node()
+            if node.type == "directory" or node:has_children() then
+              if not node:is_expanded() then -- if unexpanded, expand
+                state.commands.toggle_node(state)
+              else                           -- if expanded and has children, seleect the next child
+                require("neo-tree.ui.renderer").focus_node(
+                  state,
+                  node:get_child_ids()[1]
+                )
+              end
+            else -- if not a directory just open it
+              state.commands.open(state)
+            end
+          end,
+          copy_selector = function(state)
+            local node = state.tree:get_node()
+            local filepath = node:get_id()
+            local filename = node.name
+            local modify = vim.fn.fnamemodify
 
+            local results = {
+              e = { val = modify(filename, ":e"), msg = "Extension only" },
+              f = { val = filename, msg = "Filename" },
+              F = {
+                val = modify(filename, ":r"),
+                msg = "Filename w/o extension",
+              },
+              h = {
+                val = modify(filepath, ":~"),
+                msg = "Path relative to Home",
+              },
+              p = {
+                val = modify(filepath, ":."),
+                msg = "Path relative to CWD",
+              },
+              P = { val = filepath, msg = "Absolute path" },
+            }
 
+            local messages = {
+              { "\nChoose to copy to clipboard:\n", "Normal" },
+            }
+            for i, result in pairs(results) do
+              if result.val and result.val ~= "" then
+                vim.list_extend(messages, {
+                  { ("%s."):format(i),           "Identifier" },
+                  { (" %s: "):format(result.msg) },
+                  { result.val,                  "String" },
+                  { "\n" },
+                })
+              end
+            end
+            vim.api.nvim_echo(messages, false, {})
+            local result = results[vim.fn.getcharstr()]
+            if result and result.val and result.val ~= "" then
+              vim.notify("Copied: " .. result.val)
+              vim.fn.setreg("+", result.val)
+            end
+          end,
+          find_in_dir = function(state)
+            local node = state.tree:get_node()
+            local path = node:get_id()
+            require("telescope.builtin").find_files {
+              cwd = node.type == "directory" and path
+                  or vim.fn.fnamemodify(path, ":h"),
+            }
+          end,
+        },
+        window = {
+          width = 30,
+          mappings = {
+            ["I"] = "fuzzy_finder",
+            ["/"] = false, -- disable space until we figure out which-key disabling
+            ["<space>"] = false, -- disable space until we figure out which-key disabling
+            ["[b"] = "prev_source",
+            ["]b"] = "next_source",
+            F = "find_in_dir" or nil,
+            O = "system_open",
+            Y = "copy_selector",
+            h = "parent_or_close",
+            l = "child_or_open",
+          },
+        },
+        filesystem = {
+          follow_current_file = {
+            enabled = true,
+          },
+          hijack_netrw_behavior = "open_current",
+          use_libuv_file_watcher = true,
+        },
+        event_handlers = {
+          {
+            event = "neo_tree_buffer_enter",
+            handler = function(_) vim.opt_local.signcolumn = "auto" end,
+          },
+        },
+      }
+    end,
+  },
   {
     "smoka7/hop.nvim",
     cmd = { "HopWord" },
@@ -234,16 +374,16 @@ lvim.plugins = {
     end,
   },
 
--- {
---     "nvim-neo-tree/neo-tree.nvim",
---     branch = "v3.x",
---     dependencies = {
---       "nvim-lua/plenary.nvim",
---       "nvim-tree/nvim-web-devicons", -- not strictly required, but recommended
---       "MunifTanjim/nui.nvim",
---       -- "3rd/image.nvim", -- Optional image support in preview window: See `# Preview Mode` for more information
---     }
--- },
+  -- {
+  --     "nvim-neo-tree/neo-tree.nvim",
+  --     branch = "v3.x",
+  --     dependencies = {
+  --       "nvim-lua/plenary.nvim",
+  --       "nvim-tree/nvim-web-devicons", -- not strictly required, but recommended
+  --       "MunifTanjim/nui.nvim",
+  --       -- "3rd/image.nvim", -- Optional image support in preview window: See `# Preview Mode` for more information
+  --     }
+  -- },
   {
     "numtostr/FTerm.nvim",
     config = function()
@@ -253,7 +393,10 @@ lvim.plugins = {
 }
 
 
-
+lvim.builtin.telescope.on_config_done = function(telescope)
+  pcall(telescope.load_extension, "project")
+  -- any other extensions loading
+end
 
 
 -- Keymaps are automatically loaded on the VeryLazy event
@@ -299,9 +442,12 @@ vim.keymap.set("t", "ç", '<C-\\><C-n><CMD>lua require("FTerm").toggle()<CR>', {
 
 -- vim.keymap.set("n", "<leader>ee", ":NvimTreeToggle<CR>", { noremap = false, silent = true })
 -- vim.keymap.set("n", "<leader>ef", ":NvimTreeFindFileToggle<CR>", { noremap = false, silent = true })
-
-vim.keymap.set("n", "<leader>ee", ":Neotree toggle<CR>", { noremap = false, silent = true })
-vim.keymap.set("n", "<leader>ef", ":Neotree toggle reveal<CR>", { noremap = false, silent = true })
+lvim.builtin.which_key.mappings['e'] = {}
+lvim.keys.normal_mode["<leader>ee"] = ":Neotree toggle<CR>"
+lvim.keys.normal_mode["<leader>ef"] = ":Neotree reveal<CR>"
+-- lvim.keys.vim.keymap.set("n", "<leader>ee", ":Neotree toggle<CR>", { noremap = false, silent = true })
+-- vim.keymap.set("n", "<leader>ee", ":Neotree toggle<CR>", { noremap = false, silent = true })
+-- vim.keymap.set("n", "<leader>ef", ":Neotree toggle reveal<CR>", { noremap = false, silent = true })
 
 vim.keymap.set("n", "e", ":w<CR>", { noremap = false, silent = true })
 -- vim.keymap.set("n", "<F8>", ":MinimapToggle<CR>", { noremap = false, silent = true })
@@ -393,6 +539,7 @@ vim.keymap.set("n", "gk", ":lua vim.lsp.buf.hover()<CR>", { noremap = true, sile
 --[[ vim.keymap.set("n", "<leader>nn", ":lua NewNote()<CR>", { noremap = true, silent = false }) ]]
 vim.keymap.set("n", "<leader>nn", "<cmd>Telekasten find_notes<CR>", { noremap = true, silent = false })
 vim.keymap.set("n", "<leader>nb", "<cmd>Telekasten new_note<CR>", { noremap = true, silent = false })
+
 -- vim.keymap.set(
 -- 	"n",
 -- 	"<leader>n",
@@ -535,13 +682,16 @@ vim.keymap.set("v", "*", [[y/\V<C-r>=escape(@",'/\')<CR><CR>]], {})
 -- vim.keymap.set("v", "<C-!>", ":s/", opt)
 vim.keymap.set("n", "<C-a>", "GVgg", opt)
 -- vim.keymap.set("n","<S-Insert>","<C-R>+",opt)
+lvim.builtin.which_key.mappings["P"] = {
+  "<cmd>lua require'telescope'.extensions.project.project{}<CR>", "Projects"
+}
 vim.keymap.set("n", "<leader>zvf", ":DiffviewFileHistory<cr>", opt)
 vim.keymap.set("n", "<leader>zvo", ":DiffviewOpen<cr>", opt)
 vim.keymap.set("n", "<leader>zd", ":DevDocsUnderCursor<cr>", opt)
 -- vim.keymap.set("n", "<leader>zd",":DevDocsUnderCursor<cr>",opt)
 -- vim.keymap.set("n", "<leader>zn",":edit ~/NEORG/index.norg<cr>",opt)
 
-vim.keymap.set("n", "<leader>zx", ":only<cr>", opt)
+vim.keymap.set("n", "<leader>zz", ":only<cr>", opt)
 -- vim.keymap.set("n", "<leader>za", ":tabnew<cr>", opt)
 --[[ vim.keymap.set("n", "²", ":CloseAll<cr>", opt) ]]
 --[[ vim.keymap.set("i", "²", "<C-o>:CloseAll<cr>", opt) ]]
@@ -572,12 +722,21 @@ vim.keymap.set("n", "<leader>ta", ":TranslateW!<cr>", opt)
 vim.keymap.set("v", "<leader>ta", ":TranslateW!<cr>", opt)
 vim.keymap.set("n", "<leader>tz", ":TranslateR!<cr>", opt)
 vim.keymap.set("v", "<leader>tz", ":TranslateR!<cr>", opt)
--- vim.keymap.set("n", "<leader>zS", ":lua require('spectre').open()<CR>", opt)
+lvim.builtin.which_key.mappings["zS"] = {
+  "<cmd>lua require('spectre').open()<CR>"
+}
+
+lvim.builtin.which_key.mappings["r"] = { "", "replace" }
+lvim.builtin.which_key.mappings["rs"] = {
+  "<cmd>lua require('spectre').open_visual({select_word=true})<CR>"
+}
+
+vim.keymap.set("n", "<leader>zS", ":lua require('spectre').open()<CR>", opt)
 -- -- search current word
--- vim.keymap.set("n", "<leader>zsw", ":lua require('spectre').open_visual({select_word=true})<CR>", opt)
--- vim.keymap.set("v", "<leader>zss", ":lua require('spectre').open_visual()<CR>", opt)
--- -- search in current file
--- vim.keymap.set("n", "<leader>zsp", ":lua require('spectre').open_file_search()<cr>", opt)
+vim.keymap.set("n", "<leader>zsw", ":lua require('spectre').open_visual({select_word=true})<CR>", opt)
+vim.keymap.set("v", "<leader>zss", ":lua require('spectre').open_visual()<CR>", opt)
+-- search in current file
+vim.keymap.set("n", "<leader>zsp", ":lua require('spectre').open_file_search()<cr>", opt)
 -- vim.keymap.set("n", "<leader>znb", ":AsyncRun cpplint % <cr>", opt)
 
 -- vim.keymap.set("n","<leader>zz",":TZFocus<cr>",opt)
@@ -591,8 +750,8 @@ vim.keymap.set("n", "<C-!>", "<cmd>Telescope command_history<cr>", opt)
 vim.keymap.set("n", "j", "gj", opt)
 vim.keymap.set("n", "k", "gk", opt)
 
--- vim.keymap.set("n", "<leader>bh", "<cmd>BufferLineCyclePrev<cr>", opt)
--- vim.keymap.set("n", "<leader>bl", "<cmd>BufferLineCycleNext<cr>", opt)
+lvim.builtin.which_key.mappings["bh"] = {"<cmd>BufferLineCyclePrev<cr>", "left"}
+lvim.builtin.which_key.mappings["bl"] = {"<cmd>BufferLineCycleNext<cr>", "right"}
 -- vim.keymap.set("n", "<leader>bm", "<cmd>BufferLineCloseRight<cr>", opt)
 -- vim.keymap.set("n", "<leader>bg", "<cmd>BufferLineCloseLeft<cr>", opt)
 -- vim.keymap.set("n", "<leader>bD", "<cmd>BufferLineSortByDirectory<cr>", opt)
@@ -1057,11 +1216,11 @@ function QuitAllLua()
   vim.cmd("pclose")
   vim.cmd("helpclose")
   vim.cmd("ccl")
-  vim.cmd("NvimTreeClose")
+  -- vim.cmd("NvimTreeClose")
   vim.cmd("DiffviewClose")
   vim.cmd("nohlsearch")
   vim.cmd("TroubleClose")
-  -- vim.cmd("Neotree close")
+  vim.cmd("Neotree close")
   -- vim.cmd("SymbolsOutlineClose")
   --[[ vim.cmd("Lspsaga close_floaterm") ]]
   require("FTerm").close()
@@ -1069,5 +1228,23 @@ function QuitAllLua()
   --[[   helpclose ]]
   --[[   ccl ]]
   require("goto-preview").close_all_win()
-  require("notify").dismiss({ silent = true, pending = true })
+  -- require("notify").dismiss({ silent = true, pending = true })
+end
+
+function system_open(path)
+  local cmd
+  if vim.fn.has "win32" == 1 and vim.fn.executable "explorer" == 1 then
+    cmd = { "cmd.exe", "/K", "explorer" }
+  elseif vim.fn.has "unix" == 1 and vim.fn.executable "xdg-open" == 1 then
+    cmd = { "xdg-open" }
+  elseif
+      (vim.fn.has "mac" == 1 or vim.fn.has "unix" == 1)
+      and vim.fn.executable "open" == 1
+  then
+    cmd = { "open" }
+  end
+  vim.fn.jobstart(
+    vim.fn.extend(cmd, { path or vim.fn.expand "<cfile>" }),
+    { detach = true }
+  )
 end
