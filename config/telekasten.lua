@@ -1,4 +1,4 @@
-local home = vim.fn.expand("~/zettelkasten")
+local home = vim.fn.expand("D:/ftarroux/zettelkasten")
 -- NOTE for Windows users:
 -- - don't use Windows
 -- - try WSL2 on Windows and pretend you're on Linux
