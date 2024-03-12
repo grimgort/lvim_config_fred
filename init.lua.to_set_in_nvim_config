@@ -1,0 +1,10 @@
+A mettre dans le répertoire par default de nvim pour charger lvim
+
+
+-- Définition du chemin vers le module
+local module_path = os.getenv("LUNARVIM_RUNTIME_DIR") .. "/lvim/init.lua"
+
+-- Chargement du module
+local success, module = pcall(dofile, module_path)
+
+
