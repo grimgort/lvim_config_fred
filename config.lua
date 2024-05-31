@@ -197,6 +197,8 @@ lvim.builtin.which_key.mappings =
 			s = { "<cmd>lua require'dap'.continue()<cr>", "Start" },
 			q = { "<cmd>lua require'dap'.close()<cr>", "Quit" },
 			U = { "<cmd>lua require'dapui'.toggle({reset = true})<cr>", "Toggle UI" },
+			a = { "<cmd>e ./.vscode/launch.json<CR>", "open launch json" },
+			z = { "<cmd>lua require('dap.ext.vscode').load_launchjs(nil, { codelldb= { 'c', 'cpp' } })<CR>", "load json" },
 		},
 		p = {
 			name = "Plugins",
@@ -345,6 +347,9 @@ lvim.builtin.which_key.mappings =
 vim.keymap.set("t", "ç", '<C-\\><C-n><CMD>lua require("FTerm").toggle()<CR>', { noremap = true, silent = true })
 vim.keymap.set({ "n", "x" }, "<leader>rr", '<cmd>lua require("ssr").open()<cr>')
 vim.keymap.set("n", "<C-h>", "<CMD>SearchReplaceSingleBufferOpen<CR>")
+-- jumpllist key
+vim.keymap.set("n", "<leader>o", "<cmd>Portal jumplist backward<cr>")
+vim.keymap.set("n", "<leader>i", "<cmd>Portal jumplist forward<cr>")
 
 local opts = {}
 vim.api.nvim_set_keymap("n", '<leader>""', 'ysiw"', opts)
@@ -690,7 +695,7 @@ lvim.builtin.which_key.mappings["ra"] = {
 	"<cmd>lua require('spectre').open_visual({select_word=true})<CR>",
 }
 lvim.builtin.which_key.mappings["rz"] = {
-	"<cmd>lua require('spectre').open()<CR>",
+	"<cmd>Spectre<CR>",
 }
 
 vim.keymap.set("n", "<leader>zS", ":lua require('spectre').open()<CR>", opt)
@@ -705,6 +710,7 @@ vim.keymap.set("n", "<leader>zsp", ":lua require('spectre').open_file_search()<c
 vim.keymap.set("n", "<leader>zz", ":only<cr>", opt)
 --[[ vim.keymap.set("n", "<leader>lm", ":Lspsaga outline<cr>", opt) ]]
 vim.keymap.set("n", "<C-:>", ":Telescope commands<cr>", opt)
+vim.keymap.set("n", "!", ":Telescope commands<cr>", opt)
 vim.keymap.set("n", "<C-;>", ":Telescope keymaps<cr>", opt)
 vim.keymap.set("n", "<C-!>", "<cmd>Telescope command_history<cr>", opt)
 
@@ -1011,7 +1017,7 @@ vim.api.nvim_set_keymap("n", "s", "<cmd>HopChar1<cr>", { silent = true })
 vim.api.nvim_set_keymap("n", "S", "<cmd>HopWord<cr>", { silent = true })
 vim.api.nvim_set_keymap("v", "s", "<cmd>HopChar1<cr>", { silent = true })
 vim.api.nvim_set_keymap("v", "S", "<cmd>HopWord<cr>", { silent = true })
-vim.api.nvim_set_keymap("n", "<cr>", "<cmd>HopWord<cr>", { silent = true })
+-- vim.api.nvim_set_keymap("n", "<cr>", "<cmd>HopWord<cr>", { silent = true })
 
 vim.cmd([[
 nnoremap << >>
@@ -1236,7 +1242,8 @@ lvim.plugins = {
 	},
 	{
 		"nvim-neo-tree/neo-tree.nvim",
-		branch = "v3.x",
+		-- branch = "v3.x",
+		version = "3.22",
 		dependencies = { "MunifTanjim/nui.nvim", "s1n7ax/nvim-window-picker" },
 		cmd = "Neotree",
 		init = function()
@@ -1390,7 +1397,7 @@ lvim.plugins = {
 	},
 	{
 		"smoka7/hop.nvim",
-		cmd = { "HopWord" },
+		-- cmd = { "HopWord" },
 		opts = { keys = "etovxqpdygfblzhckisuran" },
 		config = function(_, opts)
 			require("hop").setup(opts)
@@ -1412,7 +1419,7 @@ lvim.plugins = {
     ]])
 		end,
 	},
-
+  {"tpope/vim-fugitive"},
 	--supportera bientot gitlab pour les issues et MR
 	-- {
 	--   "pwntester/octo.nvim",
@@ -1454,19 +1461,19 @@ lvim.plugins = {
 			})
 		end,
 	},
--- {
--- "wellle/context.vim",
---     config = function( )
---   vim.cmd("let g:context_enabled = 1")
---     end,
---   },
 	-- {
-  -- -- big lag with this plugin
-	-- 	"nvim-treesitter/nvim-treesitter-context",
-	-- 	-- config = function()
-	-- 	--   require("plugins.configs.nvim-treesitter-context")
-	-- 	-- end,
-	-- },
+	-- "wellle/context.vim",
+	--     config = function( )
+	--   vim.cmd("let g:context_enabled = 1")
+	--     end,
+	--   },
+	{
+	-- big lag with this plugin
+		"nvim-treesitter/nvim-treesitter-context",
+		config = function()
+		  require("config.nvim-treesitter-context")
+		end,
+	},
 	{
 		"skywind3000/asyncrun.vim",
 		enabled = true,
@@ -1507,11 +1514,11 @@ lvim.plugins = {
 		end,
 	},
 	{
-		"renerocksai/telekasten.nvim",
+		"nvim-telekasten/telekasten.nvim",
 		-- event = "VeryLazy",
 		enabled = true,
 		config = function()
-		  require("config.telekasten")
+			require("config.telekasten")
 		end,
 	},
 	{
@@ -1538,7 +1545,7 @@ lvim.plugins = {
 	},
 	{
 		"rhysd/git-messenger.vim",
-		event = "BufEnter",
+		event = "VeryLazy",
 		config = function()
 			-- vim.api.nvim_command 'let g:git_messenger_include_diff="current"'
 			--[[ vim.api.nvim_command("let g:git_messenger_floating_win_opts = { 'border': 'single' }") ]]
@@ -1546,11 +1553,50 @@ lvim.plugins = {
 			vim.api.nvim_command("let g:git_messenger_always_into_popup=v:true")
 		end,
 	},
+{'akinsho/git-conflict.nvim', version = "*", config = true},
+-- {
+--   'tanvirtin/vgit.nvim',
+--   dependencies= {
+--     'nvim-lua/plenary.nvim'
+--   },
+-- 	config = function()
+-- require('vgit').setup()
+-- 		end,
+--   },
+ {
+    "aaronhallaert/advanced-git-search.nvim",
+    config = function()
+        -- optional: setup telescope before loading the extension
+        require("telescope").setup{
+            -- move this to the place where you call the telescope setup function
+            extensions = {
+                advanced_git_search = {
+                        -- See Config
+                    }
+            }
+        }
+
+        require("telescope").load_extension("advanced_git_search")
+    end,
+    dependencies = {
+        --- See dependencies
+    },
+},
 	{
 		"xolox/vim-colorscheme-switcher",
 		dependencies = { "xolox/vim-misc" },
 		event = "VeryLazy",
 	},
+-- {
+-- 	"chrisgrieser/nvim-tinygit",
+-- 	ft = { "git_rebase", "gitcommit" }, -- so ftplugins are loaded
+-- 	dependencies = {
+-- 		"stevearc/dressing.nvim",
+-- 		"nvim-telescope/telescope.nvim", -- either telescope or fzf-lua
+-- 		-- "ibhagwan/fzf-lua",
+-- 		"rcarriga/nvim-notify", -- optional, but will lack some features without it
+-- 	},
+-- },
 	{
 		"rhysd/devdocs.vim",
 		config = function()
@@ -1674,6 +1720,14 @@ lvim.plugins = {
 			require("clean").clean_plugins()
 		end,
 	},
+	{
+		"cbochs/portal.nvim",
+		-- Optional dependencies
+		dependencies = {
+			"cbochs/grapple.nvim",
+			"ThePrimeagen/harpoon",
+		},
+	},
 }
 
 vim.api.nvim_create_user_command("Format", function(args)
@@ -1686,4 +1740,59 @@ vim.api.nvim_create_user_command("Format", function(args)
 		}
 	end
 	require("conform").format({ async = true, lsp_fallback = true, range = range })
-end, { range = true })
+end, {
+	range = true,
+})
+
+local dap = require("dap")
+dap.adapters.python = function(cb, config)
+  if config.request == 'attach' then
+    ---@diagnostic disable-next-line: undefined-field
+    local port = (config.connect or config).port
+    ---@diagnostic disable-next-line: undefined-field
+    local host = (config.connect or config).host or '127.0.0.1'
+    cb({
+      type = 'server',
+      port = assert(port, '`connect.port` is required for a python `attach` configuration'),
+      host = host,
+      options = {
+        source_filetype = 'python',
+      },
+    })
+  else
+    cb({
+      type = 'executable',
+      command = 'path/to/virtualenvs/debugpy/bin/python',
+      args = { '-m', 'debugpy.adapter' },
+      options = {
+        source_filetype = 'python',
+      },
+    })
+  end
+end
+
+dap.configurations.python = {
+  {
+    -- The first three options are required by nvim-dap
+    type = 'python'; -- the type here established the link to the adapter definition: `dap.adapters.python`
+    request = 'launch';
+    name = "Launch file";
+
+    -- Options below are for debugpy, see https://github.com/microsoft/debugpy/wiki/Debug-configuration-settings for supported options
+
+    program = "${file}"; -- This configuration will launch the current file if used.
+    pythonPath = function()
+      -- debugpy supports launching an application with a different interpreter then the one used to launch debugpy itself.
+      -- The code below looks for a `venv` or `.venv` folder in the current directly and uses the python within.
+      -- You could adapt this - to for example use the `VIRTUAL_ENV` environment variable.
+      local cwd = vim.fn.getcwd()
+      if vim.fn.executable(cwd .. '/venv/bin/python') == 1 then
+        return cwd .. '/venv/bin/python'
+      elseif vim.fn.executable(cwd .. '/.venv/bin/python') == 1 then
+        return cwd .. '/.venv/bin/python'
+      else
+        return '/usr/bin/python'
+      end
+    end;
+  },
+}
